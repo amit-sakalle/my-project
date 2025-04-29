@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Chatbot</title>
+    <!-- Link to the CSS file -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="chat-container">
+        <h1>Sales Assistant Bot</h1>
+        <div id="chatbox">
+            <!-- Chat messages will appear here -->
+            <div class="message bot-message">
+                <p>Hello! Sales Assistant bot here. How can I help you today?</p>
+            </div>
+        </div>
+        <div class="input-area">
+            <input type="text" id="userInput" placeholder="Type your message here..." autocomplete="off">
+            <button id="sendButton">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const chatbox = document.getElementById('chatbox');
+        const userInput = document.getElementById('userInput');
+        const sendButton = document.getElementById('sendButton');
+
+        function addMessage(sender, message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', sender === 'user' ? 'user-message' : 'bot-message');
+            // Use innerHTML to render potential HTML tags (like <br>, <b>) from the bot
+            messageDiv.innerHTML = `<p>${message}</p>`;
+            chatbox.appendChild(messageDiv);
+            // Scroll to the bottom
+            chatbox.scrollTop = chatbox.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const messageText = userInput.value.trim();
+            if (!messageText) return; // Don't send empty messages
+
+            // Display user message immediately
+            addMessage('user', messageText);
+            userInput.value = ''; // Clear input field
+
+            try {
+                // Send message to Flask backend
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: messageText }),
+                });
+
+                if (!response.ok) {
+                    // Handle HTTP errors
+                    addMessage('bot', `Error: ${response.statusText}`);
+                    return;
+                }
+
+                const data = await response.json();
+
+                // Display bot response
+                if (data.response) {
+                    addMessage('bot', data.response);
+                } else if (data.error) {
+                     addMessage('bot', `Error: ${data.error}`);
+                }
+
+            } catch (error) {
+                console.error("Error sending message:", error);
+                addMessage('bot', 'Sorry, something went wrong while connecting to the server.');
+            }
+        }
+
+        // Send message when button is clicked
+        sendButton.addEventListener('click', sendMessage);
+
+        // Send message when Enter key is pressed in the input field
+        userInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+    </script>
+</body>
+</html>
