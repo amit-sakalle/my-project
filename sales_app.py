@@ -84,26 +84,14 @@ def get_lead_info(lead_name):
         )
         return formatted_response, info
     else:
-        # Check for close matches (case-insensitive and space-agnostic)
-        potential_matches = [
-            key.replace("_", " ").title() 
-            for key in MOCK_CRM_DATA.keys()
-            if lead_name.lower().replace(" ", "_") == key
-        ]
-        
-        logging.info(f"Searching for lead '{lead_name}' with normalized key: {lead_key}")
-        logging.debug(f"Potential matches found: {potential_matches}")
-        
-        if potential_matches:
-            formatted_response = f"Did you mean '<b>{', '.join(potential_matches)}</b>'?"
-            logging.debug(f"Found potential matches for '{lead_name}': {potential_matches}")
-        else:
-            formatted_response = (
-                f"Sorry, I couldn't find any information for a lead named '<b>{lead_name}</b>'. "
-                "Please check the spelling or provide more details."
-            )
-            logging.warning(f"No matching lead found for query: '{lead_name}'")
-
+        # If exact normalized key match failed, return not found.
+        # Removed flawed 'potential_matches' logic.
+        logging.info(f"Searching for lead '{lead_name}' with normalized key: {lead_key} - Not found.")
+        formatted_response = (
+            f"Sorry, I couldn't find any information for a lead named '<b>{lead_name}</b>'. "
+            "Please check the spelling or provide more details."
+        )
+        logging.warning(f"No matching lead found for query: '{lead_name}'")
         return formatted_response, None
 
 # --- Response Generation Functions ---
@@ -171,13 +159,17 @@ def process_user_input_nltk(user_input):
                     entity_name = ' '.join([leaf[0] for leaf in subtree.leaves()])
                     potential_leads.append(entity_name)
 
-            # Check if any extracted potential leads match our CRM data
+            # Check if any extracted potential leads match our CRM data after normalization
             found_lead_data = None
+            original_lead_name_found = None # Store the name as extracted by NER for display
             for potential_name in potential_leads:
-                potential_name_lower = potential_name.lower()
-                if potential_name_lower in MOCK_CRM_DATA:
-                    lead_name = potential_name # Keep original casing
-                    formatted_response, found_lead_data = get_lead_info(lead_name)
+                # Normalize the extracted name like the CRM keys
+                normalized_potential_name = potential_name.lower().replace(" ", "_")
+                logging.debug(f"Checking normalized potential lead: '{normalized_potential_name}' (from NER: '{potential_name}')")
+                if normalized_potential_name in MOCK_CRM_DATA:
+                    original_lead_name_found = potential_name # Use the name NER found for the query
+                    logging.info(f"Found match via NER: '{potential_name}' matches key '{normalized_potential_name}'")
+                    formatted_response, found_lead_data = get_lead_info(original_lead_name_found)
                     break # Stop after finding the first match
 
             # If a lead was found and data retrieved
@@ -220,12 +212,15 @@ def process_user_input_nltk(user_input):
                 follow_up_question = status_followups.get(status.lower(), 
                     "What's the next planned action for this lead?")
 
-                if follow_up_question:
-                    formatted_response += f"<br><br><i>{follow_up_question}</i>"
-
+                # Add follow-up question if data was found
+                if found_lead_data and follow_up_question:
+                     formatted_response += f"<br><br><i>{follow_up_question}</i>"
+                
+                # Return the response (either with data or the 'did you mean/not found' from get_lead_info)
                 return formatted_response
             else:
-                # If info keywords present but NER didn't find a match in CRM
+                # If info keywords were present but NER didn't find any matching lead in CRM
+                logging.warning(f"Info request detected, but NER found no matching leads in CRM. Potential leads from NER: {potential_leads}")
                 return "It sounds like you're asking for lead information, but I couldn't identify a matching company name from my records. Could you please clarify which lead (e.g., 'status for Alpha Corp')?"
 
         # --- Fallback: Unknown Intent ---
