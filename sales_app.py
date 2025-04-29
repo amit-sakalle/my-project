@@ -14,8 +14,8 @@ app = Flask(__name__)
 
 # --- Download NLTK Resources (Run once at startup) ---
 try:
-    # Added 'punkt_tab' which is needed by word_tokenize internally
-    nltk_resources = ['punkt', 'punkt_tab', 'averaged_perceptron_tagger', 'maxent_ne_chunker', 'words']
+    # Added 'punkt_tab' and explicitly using 'averaged_perceptron_tagger_eng' as requested by error log
+    nltk_resources = ['punkt', 'punkt_tab', 'averaged_perceptron_tagger_eng', 'maxent_ne_chunker', 'words']
     for resource in nltk_resources:
         logging.info(f"Ensuring NLTK resource '{resource}' is available...")
         nltk.download(resource, quiet=True)
